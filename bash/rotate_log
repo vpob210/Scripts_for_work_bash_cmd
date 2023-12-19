@@ -1,0 +1,47 @@
+18  2  *  *  * /root/rotate_apach_log.sh
+
+#!/bin/bash
+
+# Указываем директорию, где находится лог Apache
+log_dir="/var/log/services"
+log_file="apache.log"
+
+# Определяем текущую дату
+current_date=$(date +"%Y-%m-%d")
+year_month=$(date +"%Y-%m")
+year=$(date +"%Y")
+
+# Создаем директории, если они не существуют
+mkdir -p "$log_dir/$year/$year_month"
+
+# Перемещаем текущий лог в соответствующую директорию
+mv "$log_dir/apache/$log_file" "$log_dir/$year/$year_month/$log_file.$current_date"
+systemctl restart httpd
+
+# Архивируем предыдущие логи
+bzip2 "$log_dir/$year/$year_month/$log_file.$current_date"
+rm -f "$log_dir/$year/$year_month/$log_file.$current_date"
+
+# Добавляем запись в базу данных
+mysql -u testuser -ptestpass -D testdb -e "INSERT INTO log_data (date, path) VALUES ('$current_date', '/var/log/services/$year/$year_month/$log_file.$current_date.bz2');"
+
+# Удаление старых логов (например, логов, старше 30 дней)
+#find "$log_dir" -type f -name "$log_file.*.bz2" -mtime +30 -exec rm {} \;
+
+
+
+# Нужно протестить вариант
+Создайте конфигурационный файл для logrotate в директории /etc/logrotate.d/, например, /etc/logrotate.d/apache:
+sudo nano /etc/logrotate.d/apache
+
+Внутри файла определите, какие лог-файлы Apache вы хотите ротировать и архивировать, а также задайте правила для ротации. Например:
+/var/log/services/apache/apache.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    create 0644 testuser testuser
+}
+
+Чтобы вручную запустить logrotate, вы можете воспользоваться следующей командой:
+sudo logrotate -f /etc/logrotate.d/apach
